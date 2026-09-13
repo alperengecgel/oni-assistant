@@ -105,56 +105,69 @@ problem_input = st.text_area(
     placeholder="Sistemin patladığı noktayı, ortam sıcaklığını ve elindeki ana materyalleri yaz..."
 )
 
-api_key = os.environ.get("GEMINI_API_KEY")
+# Streamlit secrets'tan garantili çekme
+api_key = ""
+if "GEMINI_API_KEY" in st.secrets:
+    api_key = st.secrets["GEMINI_API_KEY"]
+elif os.environ.get("GEMINI_API_KEY"):
+    api_key = os.environ.get("GEMINI_API_KEY")
 
 if st.button("Taktiksel Çözümü Hesapla", type="primary"):
     current_problem = problem_input.strip() or st.session_state.problem_text.strip()
     if not current_problem:
         st.warning("Lütfen bir problem açıklaması girin veya şablonlardan birini seçin.")
     elif not api_key:
-        st.error("API Anahtarı bulunamadı! Settings -> Secrets kontrol edilmeli.")
+        st.error("API Anahtarı bulunamadı! Secrets alanını kontrol edin.")
     else:
         with st.spinner("Termodinamik simülasyon çalıştırılıyor..."):
             prompt = f"""
-Sen dünya çapında tecrübeli bir Oxygen Not Included (ONI) mühendisisin.
-Koloni Durumu:
-- Döngü: {cycle}
-- Duplicant Sayısı: {dupes}
-- Kategori: {category}
+Sen Oxygen Not Included uzmanısın.
+Koloni: Döngü {cycle}, Nüfus {dupes}, Sektör {category}
+Sorun: {current_problem}
 
-Sorun Bildirimi:
-{current_problem}
-
-Lütfen yanıtını doğrudan aşağıdaki 4 ana başlık altında, profesyonelce ver:
-
-### 1. Kök Neden & Fiziksel Mekanik
-### 2. Adım Adım Müdahale Protokolü
-### 3. Malzeme ve Mimari Kurallar
-### 4. Döngü {cycle + 50} Önleyici Tedbir
+Doğrudan 4 başlıkta taktiksel çözüm sun:
+1. Kök Neden
+2. Adım Adım Müdahale
+3. Malzeme ve Mimari
+4. Uzun Vadeli Önlem
 """
-            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            clean_key = api_key.strip().strip('"').strip("'")
+            
+            # Hem url parametresi hem de Authorization header ile çift yönlü istek
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={clean_key}"
+            
             headers = {
                 "Content-Type": "application/json",
-                "x-goog-api-key": api_key.strip()
-            }
-            payload = {
-                "contents": [
-                    {
-                        "parts": [{"text": prompt}]
-                    }
-                ]
+                "Authorization": f"Bearer {clean_key}"
             }
             
+            payload = {
+                "contents": [{"parts": [{"text": prompt}]}]
+            }
+            
+            # İlk deneme: Bearer token ile
+            response = requests.post(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
+                headers=headers,
+                json=payload
+            )
+            
+            # Eğer 401 dönerse URL query parametresi olarak dene
+            if response.status_code != 200:
+                response = requests.post(
+                    url,
+                    headers={"Content-Type": "application/json"},
+                    json=payload
+                )
+            
             try:
-                response = requests.post(url, headers=headers, json=payload)
                 res_data = response.json()
-                
                 if response.status_code == 200:
                     answer = res_data["candidates"][0]["content"]["parts"][0]["text"]
                     st.markdown("---")
                     st.markdown("## 📋 Mühendislik Raporu")
                     st.markdown(answer)
                 else:
-                    st.error(f"Google API Hatası ({response.status_code}): {res_data}")
+                    st.error(f"Hata Kodu ({response.status_code}): {res_data.get('error', {}).get('message', res_data)}")
             except Exception as e:
-                st.error(f"Bağlantı hatası: {e}")
+                st.error(f"Yanıt işlenemedi: {e}")
