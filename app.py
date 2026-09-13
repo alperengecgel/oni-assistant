@@ -1,6 +1,6 @@
 import os
-import requests
 import streamlit as st
+from google import genai
 
 st.set_page_config(
     page_title="ONI Tactical Terminal",
@@ -54,6 +54,13 @@ st.markdown("""
 st.title("⚡ ONI Tactical Terminal")
 st.caption("Oxygen Not Included için termodinamik simülasyon ve kriz optimizasyon rehberi.")
 
+# Secrets'tan anahtarı almayı dene
+secret_key = ""
+if "GEMINI_API_KEY" in st.secrets:
+    secret_key = st.secrets["GEMINI_API_KEY"]
+elif os.environ.get("GEMINI_API_KEY"):
+    secret_key = os.environ.get("GEMINI_API_KEY")
+
 with st.sidebar:
     st.markdown("### 📊 Koloni Telemetrisi")
     cycle = st.number_input("Döngü (Cycle):", min_value=1, max_value=5000, value=75, step=5)
@@ -68,6 +75,15 @@ with st.sidebar:
             "⚡ Güç Ağı, Kömür & Otomasyon Mantığı",
             "🚰 Su Arıtma & Mikroplar (Food Poisoning)"
         ]
+    )
+    
+    st.divider()
+    # Eğer Secrets'ta yoksa veya geçersizse elle girme imkanı
+    manual_key = st.text_input(
+        "API Anahtarı (Manuel Doğrulama):", 
+        value=secret_key, 
+        type="password",
+        help="Secrets çalışmazsa buraya doğrudan anahtarını yapıştırabilirsin."
     )
 
 m1, m2, m3, m4 = st.columns(4)
@@ -105,69 +121,36 @@ problem_input = st.text_area(
     placeholder="Sistemin patladığı noktayı, ortam sıcaklığını ve elindeki ana materyalleri yaz..."
 )
 
-# Streamlit secrets'tan garantili çekme
-api_key = ""
-if "GEMINI_API_KEY" in st.secrets:
-    api_key = st.secrets["GEMINI_API_KEY"]
-elif os.environ.get("GEMINI_API_KEY"):
-    api_key = os.environ.get("GEMINI_API_KEY")
+active_key = manual_key.strip() if manual_key else secret_key.strip()
 
 if st.button("Taktiksel Çözümü Hesapla", type="primary"):
     current_problem = problem_input.strip() or st.session_state.problem_text.strip()
     if not current_problem:
         st.warning("Lütfen bir problem açıklaması girin veya şablonlardan birini seçin.")
-    elif not api_key:
-        st.error("API Anahtarı bulunamadı! Secrets alanını kontrol edin.")
+    elif not active_key:
+        st.error("API Anahtarı girilmedi! Sol menüden anahtarı yapıştırın.")
     else:
         with st.spinner("Termodinamik simülasyon çalıştırılıyor..."):
             prompt = f"""
-Sen Oxygen Not Included uzmanısın.
+Sen dünya çapında tecrübeli bir Oxygen Not Included (ONI) mühendisisin.
 Koloni: Döngü {cycle}, Nüfus {dupes}, Sektör {category}
 Sorun: {current_problem}
 
-Doğrudan 4 başlıkta taktiksel çözüm sun:
-1. Kök Neden
-2. Adım Adım Müdahale
-3. Malzeme ve Mimari
-4. Uzun Vadeli Önlem
+Lütfen doğrudan şu 4 başlıkta profesyonel mühendislik çözümü sun:
+1. Kök Neden & Termodinamik
+2. Adım Adım Acil Eylem Planı
+3. Gerekli Malzeme & Mimari (İzole borular, otomasyon vs.)
+4. Döngü {cycle + 50} Kalıcı Önlem
 """
-            clean_key = api_key.strip().strip('"').strip("'")
-            
-            # Hem url parametresi hem de Authorization header ile çift yönlü istek
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={clean_key}"
-            
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {clean_key}"
-            }
-            
-            payload = {
-                "contents": [{"parts": [{"text": prompt}]}]
-            }
-            
-            # İlk deneme: Bearer token ile
-            response = requests.post(
-                "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
-                headers=headers,
-                json=payload
-            )
-            
-            # Eğer 401 dönerse URL query parametresi olarak dene
-            if response.status_code != 200:
-                response = requests.post(
-                    url,
-                    headers={"Content-Type": "application/json"},
-                    json=payload
-                )
-            
             try:
-                res_data = response.json()
-                if response.status_code == 200:
-                    answer = res_data["candidates"][0]["content"]["parts"][0]["text"]
-                    st.markdown("---")
-                    st.markdown("## 📋 Mühendislik Raporu")
-                    st.markdown(answer)
-                else:
-                    st.error(f"Hata Kodu ({response.status_code}): {res_data.get('error', {}).get('message', res_data)}")
+                # Resmi güncel istemci
+                client = genai.Client(api_key=active_key)
+                response = client.models.generate_content(
+                    model="gemini-2.5-flash",
+                    contents=prompt
+                )
+                st.markdown("---")
+                st.markdown("## 📋 Mühendislik Raporu")
+                st.markdown(response.text)
             except Exception as e:
-                st.error(f"Yanıt işlenemedi: {e}")
+                st.error(f"Hata Detayı: {e}")
