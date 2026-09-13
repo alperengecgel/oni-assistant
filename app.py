@@ -122,37 +122,25 @@ if st.button("Taktiksel Çözümü Hesapla", type="primary"):
         st.error("API Anahtarı bulunamadı! Settings -> Secrets kontrol edilmeli.")
     else:
         prompt = f"""
-Sen dünya çapında tecrübeli bir Oxygen Not Included (ONI) mühendisisin.
-Koloni Durumu:
-- Döngü: {cycle}
-- Duplicant Sayısı: {dupes}
-- Kategori: {category}
+Sen deneyimli bir Oxygen Not Included (ONI) mühendisisin.
+Koloni Durumu: Döngü {cycle}, Nüfus {dupes}, Sektör {category}
+Sorun: {current_problem}
 
-Sorun Bildirimi:
-{current_problem}
-
-Lütfen yanıtını doğrudan aşağıdaki 4 ana başlık altında, net ve pratik ver:
-### 1. Kök Neden & Fiziksel Mekanik
-### 2. Adım Adım Müdahale Protokolü
-### 3. Malzeme ve Mimari Kurallar
-### 4. Döngü {cycle + 50} Önleyici Tedbir
+Lütfen gereksiz uzatmadan, net ve doğrudan şu 4 başlık altında uygulanabilir taktik ver:
+### 1. Kök Neden & Termodinamik
+### 2. Acil Eylem Planı (Adım Adım)
+### 3. Kullanılacak Malzeme ve Borulama Mimarisi
+### 4. Döngü {cycle + 50} İçin Kalıcı Tedbir
 """
         headers = {
             "Content-Type": "application/json",
             "X-goog-api-key": api_key.strip()
         }
         
-        # thinkingBudget: 0 sayesinde model arkada saniyelerce düşünmeden doğrudan yanıta başlar
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "thinkingConfig": {
-                    "thinkingBudget": 0
-                }
-            }
+            "contents": [{"parts": [{"text": prompt}]}]
         }
 
-        # streamGenerateContent: veriyi parça parça anlık aktarır
         url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse"
 
         st.markdown("---")
