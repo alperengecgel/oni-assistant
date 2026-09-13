@@ -2,7 +2,6 @@ import os
 import streamlit as st
 from google import genai
 
-# Sayfa Yapılandırması
 st.set_page_config(
     page_title="ONI Tactical Terminal",
     page_icon="⚡",
@@ -10,7 +9,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Özel CSS: Koyu Endüstriyel Tema
 st.markdown("""
 <style>
     .stApp {
@@ -53,16 +51,13 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Başlık Bölümü
 st.title("⚡ ONI Tactical Terminal")
 st.caption("Oxygen Not Included için termodinamik simülasyon ve kriz optimizasyon rehberi.")
 
-# Yan Menü: Sadece Koloni Parametreleri (API kutusu kaldırıldı)
 with st.sidebar:
     st.markdown("### 📊 Koloni Telemetrisi")
     cycle = st.number_input("Döngü (Cycle):", min_value=1, max_value=5000, value=75, step=5)
     dupes = st.number_input("Duplicant Sayısı:", min_value=1, max_value=50, value=8)
-    
     category = st.selectbox(
         "Kritik Sektör:",
         [
@@ -75,7 +70,6 @@ with st.sidebar:
         ]
     )
 
-# Ana Ekran Sayaçları
 m1, m2, m3, m4 = st.columns(4)
 with m1:
     st.markdown(f'<div class="metric-card"><div class="metric-value">{cycle}</div><div class="metric-label">Döngü</div></div>', unsafe_allow_html=True)
@@ -88,33 +82,38 @@ with m4:
 
 st.markdown("### 🚨 Kriz Parametreleri")
 
-# Hızlı Senaryo Seçimi
+# Session State ile metni kalıcı tutma
+if "problem_text" not in st.session_state:
+    st.session_state.problem_text = ""
+
+def set_text(val):
+    st.session_state.problem_text = val
+
 st.write("**Hızlı Kriz Şablonları:**")
 c_btn1, c_btn2, c_btn3 = st.columns(3)
 
-default_text = ""
-if c_btn1.button("🔥 Mealwood 30°C Üstü"):
-    default_text = "Döngü 60 civarı. Kömür jeneratörleri ve makineler yüzünden çiftlik odası 31°C oldu. Mealwood'lar soldu, açlık tehlikesi var. Yakında buz biyomu yok."
-if c_btn2.button("⚠️ SPOM Hidrojen Tıkanması"):
-    default_text = "Elektrolizör odası kurdum ama hidrojen boruları tıkandı ve oksijen hattına karıştı. Duplicant'lar nefes alamıyor."
-if c_btn3.button("🪨 Hatch'ler Taş Vermiyor"):
-    default_text = "Standart Hatch çiftliğim var ancak Stone Hatch'e evrilmiyorlar ve kömür üretimim tükenmek üzere. Ne yapmalıyım?"
+with c_btn1:
+    st.button("🔥 Mealwood 30°C Üstü", on_click=set_text, args=("Döngü 60 civarı. Kömür jeneratörleri ve makineler yüzünden çiftlik odası 31°C oldu. Mealwood'lar soldu, açlık tehlikesi var. Yakında buz biyomu yok.",))
+with c_btn2:
+    st.button("⚠️ SPOM Hidrojen Tıkanması", on_click=set_text, args=("Elektrolizör odası kurdum ama hidrojen boruları tıkandı ve oksijen hattına karıştı. Duplicant'lar nefes alamıyor.",))
+with c_btn3:
+    st.button("🪨 Hatch'ler Taş Vermiyor", on_click=set_text, args=("Standart Hatch çiftliğim var ancak Stone Hatch'e evrilmiyorlar ve kömür üretimim tükenmek üzere. Ne yapmalıyım?",))
 
 problem_input = st.text_area(
     "Karşılaşılan Teknik Tıkanıklık:",
-    value=default_text,
+    value=st.session_state.problem_text,
     height=110,
     placeholder="Sistemin patladığı noktayı, ortam sıcaklığını ve elindeki ana materyalleri yaz..."
 )
 
-# API Anahtarını Sistem Kasasından Alır
 api_key = os.environ.get("GEMINI_API_KEY")
 
 if st.button("Taktiksel Çözümü Hesapla", type="primary"):
-    if not problem_input.strip():
+    current_problem = problem_input.strip() or st.session_state.problem_text.strip()
+    if not current_problem:
         st.warning("Lütfen bir problem açıklaması girin veya şablonlardan birini seçin.")
     elif not api_key:
-        st.error("API Anahtarı bulunamadı! Sunucu ayarlarından GEMINI_API_KEY tanımlanmalı.")
+        st.error("API Anahtarı bulunamadı! Settings -> Secrets vault kontrol edilmeli.")
     else:
         with st.spinner("Termodinamik simülasyon çalıştırılıyor..."):
             client = genai.Client(api_key=api_key)
@@ -126,7 +125,7 @@ Koloni Durumu:
 - Kategori: {category}
 
 Sorun Bildirimi:
-{problem_input}
+{current_problem}
 
 Lütfen yanıtını doğrudan aşağıdaki 4 ana başlık altında, profesyonelce ver:
 
