@@ -144,31 +144,17 @@ Lütfen yanıtını doğrudan aşağıdaki 4 ana başlık altında, profesyonelc
                 "contents": [{"parts": [{"text": prompt}]}]
             }
 
-            # Sırasıyla kararlı modelleri dener (503 almamak için)
-            candidate_models = ["gemini-2.5-flash", "gemini-1.5-flash"]
-            success = False
-
-            for model_name in candidate_models:
-                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
-                try:
-                    response = requests.post(url, headers=headers, json=payload, timeout=25)
-                    res_data = response.json()
-                    
-                    if response.status_code == 200:
-                        answer = res_data["candidates"][0]["content"]["parts"][0]["text"]
-                        st.markdown("---")
-                        st.markdown("## 📋 Mühendislik Raporu")
-                        st.markdown(answer)
-                        success = True
-                        break
-                    elif response.status_code == 503:
-                        continue  # Diğer modele geç
-                    else:
-                        st.error(f"Hata Kodu ({response.status_code}): {res_data}")
-                        break
-                except Exception as e:
-                    st.error(f"Bağlantı hatası: {e}")
-                    break
-
-            if not success and response.status_code == 503:
-                st.error("Google sunucularında anlık küresel yoğunluk var. Lütfen 10-15 saniye sonra tekrar deneyin.")
+            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent"
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=30)
+                res_data = response.json()
+                
+                if response.status_code == 200:
+                    answer = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                    st.markdown("---")
+                    st.markdown("## 📋 Mühendislik Raporu")
+                    st.markdown(answer)
+                else:
+                    st.error(f"Hata Kodu ({response.status_code}): {res_data.get('error', {}).get('message', res_data)}")
+            except Exception as e:
+                st.error(f"Bağlantı hatası: {e}")
