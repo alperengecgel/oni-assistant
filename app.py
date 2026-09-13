@@ -1,7 +1,6 @@
 import os
-import json
-import requests
 import streamlit as st
+from google import genai
 
 st.set_page_config(
     page_title="ONI Tactical Terminal",
@@ -55,11 +54,7 @@ st.markdown("""
 st.title("⚡ ONI Tactical Terminal")
 st.caption("Oxygen Not Included için termodinamik simülasyon ve kriz optimizasyon rehberi.")
 
-api_key = ""
-if "GEMINI_API_KEY" in st.secrets:
-    api_key = st.secrets["GEMINI_API_KEY"]
-elif os.environ.get("GEMINI_API_KEY"):
-    api_key = os.environ.get("GEMINI_API_KEY")
+api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 
 with st.sidebar:
     st.markdown("### 📊 Koloni Telemetrisi")
@@ -117,40 +112,33 @@ if st.button("Taktiksel Çözümü Hesapla", type="primary"):
     if not current_problem:
         st.warning("Lütfen bir problem açıklaması girin veya şablonlardan birini seçin.")
     elif not api_key:
-        st.error("API Anahtarı bulunamadı! Settings -> Secrets kontrol edilmeli.")
+        st.error("API Anahtarı bulunamadı!")
     else:
-        headers = {
-            "Content-Type": "application/json",
-            "X-goog-api-key": api_key.strip()
-        }
-        
-        payload = {
-            "system_instruction": {
-                "parts": [{
-                    "text": "Sen uzman bir Oxygen Not Included (ONI) mühendisisin. Sadece Türkçe yanıt ver. Gereksiz giriş/çıkış cümleleri kurma, doğrudan 4 başlık altında net maddelerle pratik mühendislik çözümü sun."
-                }]
-            },
-            "contents": [{
-                "parts": [{
-                    "text": f"Koloni: Döngü {cycle}, Dup: {dupes}, Sektör: {category}\nSorun: {current_problem}\n\nBaşlıklar:\n### 1. Kök Neden\n### 2. Acil Eylem Planı\n### 3. Malzeme ve Mimari\n### 4. Döngü {cycle + 50} Önlemi"
-                }]
-            }]
-        }
-        
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent"
+        prompt = f"""
+Sen uzman bir Oxygen Not Included (ONI) mühendisisin.
+Koloni Durumu: Döngü {cycle}, Nüfus {dupes}, Sektör {category}
+Sorun: {current_problem}
 
-        with st.spinner("⚡ Termodinamik simülasyon hesaplanıyor..."):
-            try:
-                response = requests.post(url, headers=headers, json=payload, timeout=25)
-                if response.status_code == 200:
-                    res_data = response.json()
-                    answer = res_data["candidates"][0]["content"]["parts"][0]["text"]
-                    st.markdown("---")
-                    st.markdown("## 📋 Mühendislik Raporu")
-                    st.markdown(answer)
-                else:
-                    st.error(f"Hata ({response.status_code}): {response.text}")
-            except requests.exceptions.Timeout:
-                st.error("Bağlantı zaman aşımına uğradı, lütfen tekrar deneyin.")
-            except Exception as ex:
-                st.error(f"Bağlantı hatası: {ex}")
+Doğrudan ve pratik şekilde şu 4 başlıkta taktik ver:
+### 1. Kök Neden
+### 2. Acil Eylem Planı (Adım Adım)
+### 3. Malzeme ve Mimari Kurallar
+### 4. Döngü {cycle + 50} Önleyici Tedbir
+"""
+        client = genai.Client(api_key=api_key.strip())
+        
+        st.markdown("---")
+        st.markdown("## 📋 Mühendislik Raporu")
+        
+        def response_stream():
+            response = client.models.generate_content_stream(
+                model="gemini-2.5-flash",
+                contents=prompt
+            )
+            for chunk in response:
+                yield chunk.text
+
+        try:
+            st.write_stream(response_stream)
+        except Exception as e:
+            st.error(f"Hata: {e}")
