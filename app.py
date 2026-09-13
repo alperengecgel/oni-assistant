@@ -119,32 +119,29 @@ if st.button("Taktiksel Çözümü Hesapla", type="primary"):
     elif not api_key:
         st.error("API Anahtarı bulunamadı! Settings -> Secrets kontrol edilmeli.")
     else:
-        prompt = f"""
-Sen Oxygen Not Included (ONI) baş mühendisisin.
-Döngü: {cycle}, Nüfus: {dupes}, Sektör: {category}
-Sorun: {current_problem}
-
-Doğrudan kısa, net maddelerle şu 4 başlıkta pratik taktik ver:
-### 1. Kök Neden
-### 2. Acil Eylem Planı (Adım Adım)
-### 3. Kullanılacak Malzeme & Mimari
-### 4. Kalıcı Tedbir (Döngü {cycle + 50})
-"""
         headers = {
             "Content-Type": "application/json",
             "X-goog-api-key": api_key.strip()
         }
+        
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {
-                "maxOutputTokens": 700
-            }
+            "system_instruction": {
+                "parts": [{
+                    "text": "Sen uzman bir Oxygen Not Included (ONI) mühendisisin. Sadece Türkçe yanıt ver. Gereksiz giriş/çıkış cümleleri kurma, doğrudan 4 başlık altında net maddelerle pratik mühendislik çözümü sun."
+                }]
+            },
+            "contents": [{
+                "parts": [{
+                    "text": f"Koloni: Döngü {cycle}, Dup: {dupes}, Sektör: {category}\nSorun: {current_problem}\n\nBaşlıklar:\n### 1. Kök Neden\n### 2. Acil Eylem Planı\n### 3. Malzeme ve Mimari\n### 4. Döngü {cycle + 50} Önlemi"
+                }]
+            }]
         }
+        
         url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent"
 
         with st.spinner("⚡ Termodinamik simülasyon hesaplanıyor..."):
             try:
-                response = requests.post(url, headers=headers, json=payload, timeout=12)
+                response = requests.post(url, headers=headers, json=payload, timeout=25)
                 if response.status_code == 200:
                     res_data = response.json()
                     answer = res_data["candidates"][0]["content"]["parts"][0]["text"]
