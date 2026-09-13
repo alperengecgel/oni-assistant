@@ -55,7 +55,6 @@ st.markdown("""
 st.title("⚡ ONI Tactical Terminal")
 st.caption("Oxygen Not Included için termodinamik simülasyon ve kriz optimizasyon rehberi.")
 
-# API Anahtarı Çekme
 api_key = ""
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
@@ -78,7 +77,6 @@ with st.sidebar:
         ]
     )
 
-# Üst Bilgi Kartları
 m1, m2, m3, m4 = st.columns(4)
 with m1:
     st.markdown(f'<div class="metric-card"><div class="metric-value">{cycle}</div><div class="metric-label">Döngü</div></div>', unsafe_allow_html=True)
@@ -123,10 +121,10 @@ if st.button("Taktiksel Çözümü Hesapla", type="primary"):
     else:
         prompt = f"""
 Sen Oxygen Not Included (ONI) baş mühendisisin.
-Koloni Durumu: Döngü {cycle}, Nüfus {dupes}, Sektör {category}
-Sorun Bildirimi: {current_problem}
+Döngü: {cycle}, Nüfus: {dupes}, Sektör: {category}
+Sorun: {current_problem}
 
-Kısa, net ve doğrudan şu 4 başlık altında uygulanabilir çözüm ver:
+Düşünme aşaması olmadan doğrudan en net mühendislik çözümünü yaz:
 ### 1. Kök Neden & Termodinamik
 ### 2. Acil Eylem Planı (Adım Adım)
 ### 3. Kullanılacak Malzeme ve Borulama Mimarisi
@@ -136,24 +134,36 @@ Kısa, net ve doğrudan şu 4 başlık altında uygulanabilir çözüm ver:
             "Content-Type": "application/json",
             "X-goog-api-key": api_key.strip()
         }
+        
+        # Düşünme süresini minimuma (1) çekip anında yanıt vermesini sağlayan gövde
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}]
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "thinkingConfig": {
+                    "thinkingBudget": 1
+                },
+                "temperature": 0.3
+            }
         }
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse"
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse"
 
         spinner_placeholder = st.empty()
         with spinner_placeholder:
             with st.spinner("⚡ Termodinamik simülasyon hesaplanıyor..."):
                 try:
-                    response = requests.post(url, headers=headers, json=payload, stream=True, timeout=30)
+                    response = requests.post(url, headers=headers, json=payload, stream=True, timeout=20)
                 except Exception as ex:
                     st.error(f"Bağlantı hatası: {ex}")
                     response = None
 
         if response is not None:
             if response.status_code != 200:
-                st.error(f"Hata ({response.status_code}): {response.text}")
-            else:
+                # 2.0 veya thinkingBudget desteklenmezse hızlı fallback
+                url_fallback = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse"
+                fallback_payload = {"contents": [{"parts": [{"text": prompt}]}]}
+                response = requests.post(url_fallback, headers=headers, json=fallback_payload, stream=True, timeout=20)
+
+            if response.status_code == 200:
                 response.encoding = 'utf-8'
                 st.markdown("---")
                 st.markdown("## 📋 Mühendislik Raporu")
@@ -170,3 +180,5 @@ Kısa, net ve doğrudan şu 4 başlık altında uygulanabilir çözüm ver:
                                 continue
 
                 st.write_stream(stream_generator)
+            else:
+                st.error(f"Hata ({response.status_code}): {response.text}")
