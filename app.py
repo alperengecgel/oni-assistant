@@ -132,7 +132,7 @@ Doğrudan ve pratik şekilde şu 4 başlıkta taktik ver:
         
         def response_stream():
             response = client.models.generate_content_stream(
-                model="gemini-2.5-flash",
+                model="gemini-3.6-flash",
                 contents=prompt
             )
             for chunk in response:
