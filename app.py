@@ -55,7 +55,6 @@ st.markdown("""
 st.title("⚡ ONI Tactical Terminal")
 st.caption("Oxygen Not Included için termodinamik simülasyon ve kriz optimizasyon rehberi.")
 
-# API Anahtarı Çekme
 api_key = ""
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
@@ -78,7 +77,6 @@ with st.sidebar:
         ]
     )
 
-# Üst Bilgi Kartları
 m1, m2, m3, m4 = st.columns(4)
 with m1:
     st.markdown(f'<div class="metric-card"><div class="metric-value">{cycle}</div><div class="metric-label">Döngü</div></div>', unsafe_allow_html=True)
@@ -122,47 +120,46 @@ if st.button("Taktiksel Çözümü Hesapla", type="primary"):
         st.error("API Anahtarı bulunamadı! Settings -> Secrets kontrol edilmeli.")
     else:
         prompt = f"""
-Sen deneyimli bir Oxygen Not Included (ONI) mühendisisin.
+Sen Oxygen Not Included (ONI) baş mühendisisin.
 Koloni Durumu: Döngü {cycle}, Nüfus {dupes}, Sektör {category}
-Sorun: {current_problem}
+Sorun Bildirimi: {current_problem}
 
-Lütfen gereksiz uzatmadan, net ve doğrudan şu 4 başlık altında uygulanabilir taktik ver:
+Kısa, net ve doğrudan şu 4 başlık altında uygulanabilir çözüm ver:
 ### 1. Kök Neden & Termodinamik
 ### 2. Acil Eylem Planı (Adım Adım)
 ### 3. Kullanılacak Malzeme ve Borulama Mimarisi
-### 4. Döngü {cycle + 50} İçin Kalıcı Tedbir
+### 4. Döngü {cycle + 50} Kalıcı Önlem
 """
         headers = {
             "Content-Type": "application/json",
             "X-goog-api-key": api_key.strip()
         }
-        
         payload = {
             "contents": [{"parts": [{"text": prompt}]}]
         }
-
         url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse"
 
         st.markdown("---")
         st.markdown("## 📋 Mühendislik Raporu")
-        report_placeholder = st.empty()
-        full_text = ""
 
-        try:
-            with requests.post(url, headers=headers, json=payload, stream=True, timeout=30) as r:
-                if r.status_code == 200:
+        def stream_generator():
+            try:
+                with requests.post(url, headers=headers, json=payload, stream=True, timeout=30) as r:
+                    if r.status_code != 200:
+                        yield f"Hata ({r.status_code}): {r.text}"
+                        return
+                    
+                    r.encoding = 'utf-8'
                     for line in r.iter_lines(decode_unicode=True):
                         if line and line.startswith("data: "):
-                            data_str = line[6:]
+                            data_str = line[6:].strip()
                             try:
                                 chunk = json.loads(data_str)
                                 text_part = chunk["candidates"][0]["content"]["parts"][0]["text"]
-                                full_text += text_part
-                                report_placeholder.markdown(full_text + "▌")
+                                yield text_part
                             except Exception:
                                 continue
-                    report_placeholder.markdown(full_text)
-                else:
-                    st.error(f"Hata Kodu ({r.status_code}): {r.text}")
-        except Exception as e:
-            st.error(f"Bağlantı hatası: {e}")
+            except Exception as ex:
+                yield f"Bağlantı hatası: {ex}"
+
+        st.write_stream(stream_generator)
