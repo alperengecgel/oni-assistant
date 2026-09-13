@@ -124,61 +124,36 @@ Sen Oxygen Not Included (ONI) baş mühendisisin.
 Döngü: {cycle}, Nüfus: {dupes}, Sektör: {category}
 Sorun: {current_problem}
 
-Düşünme aşaması olmadan doğrudan en net mühendislik çözümünü yaz:
-### 1. Kök Neden & Termodinamik
+Doğrudan kısa, net maddelerle şu 4 başlıkta pratik taktik ver:
+### 1. Kök Neden
 ### 2. Acil Eylem Planı (Adım Adım)
-### 3. Kullanılacak Malzeme ve Borulama Mimarisi
-### 4. Döngü {cycle + 50} Kalıcı Önlem
+### 3. Kullanılacak Malzeme & Mimari
+### 4. Kalıcı Tedbir (Döngü {cycle + 50})
 """
         headers = {
             "Content-Type": "application/json",
             "X-goog-api-key": api_key.strip()
         }
-        
-        # Düşünme süresini minimuma (1) çekip anında yanıt vermesini sağlayan gövde
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
-                "thinkingConfig": {
-                    "thinkingBudget": 1
-                },
-                "temperature": 0.3
+                "maxOutputTokens": 700
             }
         }
-        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse"
+        url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent"
 
-        spinner_placeholder = st.empty()
-        with spinner_placeholder:
-            with st.spinner("⚡ Termodinamik simülasyon hesaplanıyor..."):
-                try:
-                    response = requests.post(url, headers=headers, json=payload, stream=True, timeout=20)
-                except Exception as ex:
-                    st.error(f"Bağlantı hatası: {ex}")
-                    response = None
-
-        if response is not None:
-            if response.status_code != 200:
-                # 2.0 veya thinkingBudget desteklenmezse hızlı fallback
-                url_fallback = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse"
-                fallback_payload = {"contents": [{"parts": [{"text": prompt}]}]}
-                response = requests.post(url_fallback, headers=headers, json=fallback_payload, stream=True, timeout=20)
-
-            if response.status_code == 200:
-                response.encoding = 'utf-8'
-                st.markdown("---")
-                st.markdown("## 📋 Mühendislik Raporu")
-
-                def stream_generator():
-                    for line in response.iter_lines(decode_unicode=True):
-                        if line and line.startswith("data: "):
-                            data_str = line[6:].strip()
-                            try:
-                                chunk = json.loads(data_str)
-                                text_part = chunk["candidates"][0]["content"]["parts"][0]["text"]
-                                yield text_part
-                            except Exception:
-                                continue
-
-                st.write_stream(stream_generator)
-            else:
-                st.error(f"Hata ({response.status_code}): {response.text}")
+        with st.spinner("⚡ Termodinamik simülasyon hesaplanıyor..."):
+            try:
+                response = requests.post(url, headers=headers, json=payload, timeout=12)
+                if response.status_code == 200:
+                    res_data = response.json()
+                    answer = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                    st.markdown("---")
+                    st.markdown("## 📋 Mühendislik Raporu")
+                    st.markdown(answer)
+                else:
+                    st.error(f"Hata ({response.status_code}): {response.text}")
+            except requests.exceptions.Timeout:
+                st.error("Bağlantı zaman aşımına uğradı, lütfen tekrar deneyin.")
+            except Exception as ex:
+                st.error(f"Bağlantı hatası: {ex}")
