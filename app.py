@@ -55,6 +55,7 @@ st.markdown("""
 st.title("⚡ ONI Tactical Terminal")
 st.caption("Oxygen Not Included için termodinamik simülasyon ve kriz optimizasyon rehberi.")
 
+# API Anahtarı Çekme
 api_key = ""
 if "GEMINI_API_KEY" in st.secrets:
     api_key = st.secrets["GEMINI_API_KEY"]
@@ -77,6 +78,7 @@ with st.sidebar:
         ]
     )
 
+# Üst Bilgi Kartları
 m1, m2, m3, m4 = st.columns(4)
 with m1:
     st.markdown(f'<div class="metric-card"><div class="metric-value">{cycle}</div><div class="metric-label">Döngü</div></div>', unsafe_allow_html=True)
@@ -139,18 +141,25 @@ Kısa, net ve doğrudan şu 4 başlık altında uygulanabilir çözüm ver:
         }
         url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:streamGenerateContent?alt=sse"
 
-        st.markdown("---")
-        st.markdown("## 📋 Mühendislik Raporu")
+        spinner_placeholder = st.empty()
+        with spinner_placeholder:
+            with st.spinner("⚡ Termodinamik simülasyon hesaplanıyor..."):
+                try:
+                    response = requests.post(url, headers=headers, json=payload, stream=True, timeout=30)
+                except Exception as ex:
+                    st.error(f"Bağlantı hatası: {ex}")
+                    response = None
 
-        def stream_generator():
-            try:
-                with requests.post(url, headers=headers, json=payload, stream=True, timeout=30) as r:
-                    if r.status_code != 200:
-                        yield f"Hata ({r.status_code}): {r.text}"
-                        return
-                    
-                    r.encoding = 'utf-8'
-                    for line in r.iter_lines(decode_unicode=True):
+        if response is not None:
+            if response.status_code != 200:
+                st.error(f"Hata ({response.status_code}): {response.text}")
+            else:
+                response.encoding = 'utf-8'
+                st.markdown("---")
+                st.markdown("## 📋 Mühendislik Raporu")
+
+                def stream_generator():
+                    for line in response.iter_lines(decode_unicode=True):
                         if line and line.startswith("data: "):
                             data_str = line[6:].strip()
                             try:
@@ -159,7 +168,5 @@ Kısa, net ve doğrudan şu 4 başlık altında uygulanabilir çözüm ver:
                                 yield text_part
                             except Exception:
                                 continue
-            except Exception as ex:
-                yield f"Bağlantı hatası: {ex}"
 
-        st.write_stream(stream_generator)
+                st.write_stream(stream_generator)
