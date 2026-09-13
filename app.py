@@ -1,6 +1,6 @@
 import os
+import requests
 import streamlit as st
-from google import genai
 
 st.set_page_config(
     page_title="ONI Tactical Terminal",
@@ -82,7 +82,6 @@ with m4:
 
 st.markdown("### 🚨 Kriz Parametreleri")
 
-# Session State ile metni kalıcı tutma
 if "problem_text" not in st.session_state:
     st.session_state.problem_text = ""
 
@@ -113,10 +112,9 @@ if st.button("Taktiksel Çözümü Hesapla", type="primary"):
     if not current_problem:
         st.warning("Lütfen bir problem açıklaması girin veya şablonlardan birini seçin.")
     elif not api_key:
-        st.error("API Anahtarı bulunamadı! Settings -> Secrets vault kontrol edilmeli.")
+        st.error("API Anahtarı bulunamadı! Settings -> Secrets kontrol edilmeli.")
     else:
         with st.spinner("Termodinamik simülasyon çalıştırılıyor..."):
-            client = genai.Client(api_key=api_key)
             prompt = f"""
 Sen dünya çapında tecrübeli bir Oxygen Not Included (ONI) mühendisisin.
 Koloni Durumu:
@@ -134,13 +132,29 @@ Lütfen yanıtını doğrudan aşağıdaki 4 ana başlık altında, profesyonelc
 ### 3. Malzeme ve Mimari Kurallar
 ### 4. Döngü {cycle + 50} Önleyici Tedbir
 """
+            url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent"
+            headers = {
+                "Content-Type": "application/json",
+                "x-goog-api-key": api_key.strip()
+            }
+            payload = {
+                "contents": [
+                    {
+                        "parts": [{"text": prompt}]
+                    }
+                ]
+            }
+            
             try:
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=prompt
-                )
-                st.markdown("---")
-                st.markdown("## 📋 Mühendislik Raporu")
-                st.markdown(response.text)
+                response = requests.post(url, headers=headers, json=payload)
+                res_data = response.json()
+                
+                if response.status_code == 200:
+                    answer = res_data["candidates"][0]["content"]["parts"][0]["text"]
+                    st.markdown("---")
+                    st.markdown("## 📋 Mühendislik Raporu")
+                    st.markdown(answer)
+                else:
+                    st.error(f"Google API Hatası ({response.status_code}): {res_data}")
             except Exception as e:
-                st.error(f"Hata oluştu: {e}")
+                st.error(f"Bağlantı hatası: {e}")
